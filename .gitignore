@@ -19,6 +19,9 @@ runner/
 go-gateway/data/
 go-gateway/go-llm-gateway
 
+# deb 打包输出
+dist/
+
 # MyGo desktop output (excluded from Spotlight indexing)
 desktop/build.noindex/
 desktop/.mygo/

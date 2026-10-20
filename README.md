@@ -35,6 +35,34 @@ $installer = Join-Path $env:TEMP 'llm-gateway-install.ps1'; Invoke-WebRequest -U
 安装脚本会自动完成：下载二进制 → 配置 PATH → 引导填入 API Key → 完成。
 Windows 请直接在 CMD 或 PowerShell 中运行对应命令，不需要 WSL 或 Bash。配置向导可逐个启用多个供应商，API Key 会掩码输入。重复运行会自动去除 PATH 中的重复安装项，并可在保留 Master Key 和自定义变量的前提下重新配置供应商。
 
+### Debian / Ubuntu (.deb)
+
+Debian、Ubuntu 及其衍生发行版可以直接安装 Release 附带的 .deb 包（提供 amd64 / arm64 两个架构）：
+
+```bash
+# 从最新 Release 下载并安装（自动注册 systemd 服务并生成随机 Master Key）
+curl -fsSL -o easygateway.deb https://github.com/hwj123hwj/litellm-gateway/releases/latest/download/easygateway_0.3.5-1_amd64.deb
+sudo dpkg -i easygateway.deb || sudo apt-get install -f
+```
+
+> 注意：上面的文件名含版本号，请到 [Releases](https://github.com/hwj123hwj/litellm-gateway/releases/latest) 按架构选择对应文件。
+
+安装后的布局：
+
+| 路径 | 说明 |
+|------|------|
+| `/usr/bin/gateway` | 网关二进制 |
+| `/etc/easygateway/providers.yaml` | Provider 配置（升级时保留本地修改） |
+| `/etc/easygateway/easygateway.env` | 环境变量（首次安装自动生成，含随机 Master Key，填入 API Key 后重启服务） |
+| `/var/lib/easygateway` | 运行数据（SQLite、技能同步等） |
+| `easygateway.service` | systemd 服务，监听 `:4001` |
+
+```bash
+sudo systemctl status easygateway     # 查看服务状态
+sudo systemctl restart easygateway    # 修改配置后重启
+sudo dpkg --purge easygateway         # 卸载并清除全部数据
+```
+
 ## 快速启动
 
 ### 本地开发
@@ -115,7 +143,7 @@ MY_PROVIDER_API_KEY=sk-xxx
 
 ### 服务器部署
 
-本机部署由用户显式运行脚本；推送 `main` 或提交 PR 不会直接重启服务。已安装迷你主机更新器的主机则由 timer 每 10 分钟检查 main 的成功 CI 产物，校验并通过健康检查后自动切换；未安装更新器的主机不会更新。版本标签触发 Release 构建发布，详见 [服务器部署](go-gateway/README.md#服务器部署)。
+本机部署由用户显式运行脚本；推送 `main` 或提交 PR 不会直接重启服务。Debian/Ubuntu 服务器推荐安装 Release 附带的 .deb 包（见上文），由 systemd 托管常驻运行。已安装迷你主机更新器的主机则由 timer 每 10 分钟检查 main 的成功 CI 产物，校验并通过健康检查后自动切换；未安装更新器的主机不会更新。版本标签触发 Release 构建发布，详见 [服务器部署](go-gateway/README.md#服务器部署)。
 
 版本线自 `v0.1.0` 重新开始（2026-10-10，产品更名 EasyGateway）；旧 `v1.x` 标签与 Release 已移除，迷你主机更新器只部署与 main 一致的最新构建，不受影响。
 

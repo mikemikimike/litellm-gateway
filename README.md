@@ -40,12 +40,12 @@ Windows 请直接在 CMD 或 PowerShell 中运行对应命令，不需要 WSL �
 Debian、Ubuntu 及其衍生发行版可以直接安装 Release 附带的 .deb 包（提供 amd64 / arm64 两个架构）：
 
 ```bash
-# 从最新 Release 下载并安装（自动注册 systemd 服务并生成随机 Master Key）
-curl -fsSL -o easygateway.deb https://github.com/hwj123hwj/litellm-gateway/releases/latest/download/easygateway_0.3.5-1_amd64.deb
-sudo dpkg -i easygateway.deb || sudo apt-get install -f
+# 从最新 Release 下载并安装服务端（自动注册 systemd 服务并生成随机 Master Key）
+curl -fsSL -o easygateway-server.deb https://github.com/hwj123hwj/litellm-gateway/releases/latest/download/easygateway-server_0.3.7-1_amd64.deb
+sudo dpkg -i easygateway-server.deb || sudo apt-get install -f
 ```
 
-> 注意：上面的文件名含版本号，请到 [Releases](https://github.com/hwj123hwj/litellm-gateway/releases/latest) 按架构选择对应文件。
+> 注意：上面的文件名含版本号，请到 [Releases](https://github.com/hwj123hwj/litellm-gateway/releases/latest) 按架构选择对应文件。从 v0.3.7 起服务端包名为 `easygateway-server`，与桌面客户端的 `easygateway` 包相互独立，可同时安装；从 v0.3.6 及更早的服务端包（旧名 `easygateway`）升级时，dpkg 会自动迁移到新包名。
 
 安装后的布局：
 
@@ -58,10 +58,21 @@ sudo dpkg -i easygateway.deb || sudo apt-get install -f
 | `easygateway.service` | systemd 服务，监听 `:4001` |
 
 ```bash
-sudo systemctl status easygateway     # 查看服务状态
-sudo systemctl restart easygateway    # 修改配置后重启
-sudo dpkg --purge easygateway         # 卸载并清除全部数据
+sudo systemctl status easygateway      # 查看服务状态
+sudo systemctl restart easygateway     # 修改配置后重启
+sudo dpkg --purge easygateway-server   # 卸载并清除全部数据
 ```
+
+### 桌面端 (Linux .deb)
+
+桌面管理端从 v0.3.7 起提供 Linux 包（amd64 / arm64），安装后出现在应用菜单，命令行入口为 `easygateway-desktop`。桌面端只管理网关，不自带网关进程；运行需要 GTK3 与 WebKitGTK 4.1（包依赖已声明）：
+
+```bash
+curl -fsSL -o easygateway-desktop.deb https://github.com/hwj123hwj/litellm-gateway/releases/latest/download/easygateway_0.3.7_amd64.deb
+sudo dpkg -i easygateway-desktop.deb || sudo apt-get install -f
+```
+
+偏好用户级安装（免 root，装到 `~/.easygateway`）可下载 `easygateway-desktop-install-linux-<架构>.sh` 运行；首次打开按界面提示填写网关地址与 Admin Token（本机网关默认 `http://127.0.0.1:4001`）。卸载：`sudo dpkg --purge easygateway`。
 
 ## 快速启动
 

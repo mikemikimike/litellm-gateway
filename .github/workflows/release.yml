@@ -153,6 +153,47 @@ jobs:
           path: desktop-release/*.dmg
           if-no-files-found: error
 
+  desktop-release-linux:
+    name: Build Linux desktop release
+    runs-on: ubuntu-latest
+    needs: installer-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: desktop/go.sum
+      - name: Validate desktop version
+        working-directory: desktop
+        run: |
+          VERSION=$(python3 -c 'import json; print(json.load(open("mygo.json"))["version"])')
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "Release tag does not match desktop version $VERSION" >&2
+            exit 1
+          fi
+      - run: go test -race ./... && go vet ./...
+        working-directory: desktop
+      - run: go run github.com/egoist/mygo/cmd/mygo vet
+        working-directory: desktop
+      - name: Build desktop packages (Linux amd64 + arm64)
+        working-directory: desktop
+        run: |
+          go run github.com/egoist/mygo/cmd/mygo build -platform linux/amd64,linux/arm64
+          VERSION=$(python3 -c 'import json; print(json.load(open("mygo.json"))["version"])')
+          mkdir -p ../desktop-release
+          for arch in amd64 arm64; do
+            dpkg-deb --info "build.noindex/linux-$arch/easygateway_${VERSION}_${arch}.deb" > /dev/null
+            dpkg-deb -c "build.noindex/linux-$arch/easygateway_${VERSION}_${arch}.deb" | grep -q "opt/easygateway/easygateway$"
+            cp "build.noindex/linux-$arch/easygateway_${VERSION}_${arch}.deb" "../desktop-release/"
+            cp "build.noindex/linux-$arch/easygateway-${VERSION}-linux-$arch.tar.gz" "../desktop-release/"
+            cp "build.noindex/linux-$arch/install.sh" "../desktop-release/easygateway-desktop-install-linux-$arch.sh"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: desktop-release/*
+          if-no-files-found: error
+
   publish:
     name: Create Release
     runs-on: ubuntu-latest
@@ -160,6 +201,7 @@ jobs:
       - installer-tests
       - release
       - desktop-release
+      - desktop-release-linux
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -183,6 +225,11 @@ jobs:
           # 复制 deb 包
           cp artifacts/easygateway-deb-linux-amd64/*.deb release/
           cp artifacts/easygateway-deb-linux-arm64/*.deb release/
+          # 复制桌面 Linux 包（deb / 用户级 tar.gz / install 脚本）
+          cp artifacts/desktop-linux/easygateway_*_amd64.deb release/
+          cp artifacts/desktop-linux/easygateway_*_arm64.deb release/
+          cp artifacts/desktop-linux/easygateway-*-linux-*.tar.gz release/
+          cp artifacts/desktop-linux/easygateway-desktop-install-linux-*.sh release/
           # 复制配置文件
           cp go-gateway/providers.yaml release/
           cp go-gateway/.env.example release/default.env.example
@@ -191,7 +238,7 @@ jobs:
           cp scripts/install.bat release/
           cp scripts/install.ps1 release/
           cp artifacts/desktop-darwin-arm64/*.dmg release/
-          (cd release && sha256sum gateway-* *.deb *.dmg providers.yaml default.env.example install.* > SHA256SUMS)
+          (cd release && sha256sum gateway-* *.deb *.tar.gz *.dmg providers.yaml default.env.example install.* easygateway-desktop-install-*.sh > SHA256SUMS)
           # 列出文件
           ls -lh release/
 
@@ -231,13 +278,19 @@ jobs:
           | 平台 | 文件 |
           |------|------|
           | macOS Apple Silicon 桌面 | \`EasyGateway-${CURRENT_TAG#v}-darwin-arm64.dmg\` |
-          | Linux x86_64 (.deb) | \`easygateway-${CURRENT_TAG#v}-1_amd64.deb\` |
-          | Linux ARM64 (.deb) | \`easygateway-${CURRENT_TAG#v}-1_arm64.deb\` |
+          | Linux x86_64 桌面 (.deb) | \`easygateway_${CURRENT_TAG#v}_amd64.deb\` |
+          | Linux ARM64 桌面 (.deb) | \`easygateway_${CURRENT_TAG#v}_arm64.deb\` |
+          | Linux x86_64 桌面 (用户级安装) | \`easygateway-desktop-install-linux-amd64.sh\` |
+          | Linux ARM64 桌面 (用户级安装) | \`easygateway-desktop-install-linux-arm64.sh\` |
+          | Linux x86_64 服务端 (.deb) | \`easygateway-server-${CURRENT_TAG#v}-1_amd64.deb\` |
+          | Linux ARM64 服务端 (.deb) | \`easygateway-server-${CURRENT_TAG#v}-1_arm64.deb\` |
           | Linux x86_64 | \`gateway-linux-amd64\` |
           | Linux ARM64 | \`gateway-linux-arm64\` |
           | macOS Intel | \`gateway-darwin-amd64\` |
           | macOS Apple Silicon | \`gateway-darwin-arm64\` |
           | Windows x86_64 | \`gateway-windows-amd64.exe\` |
+
+          桌面端与服务端是两个独立的 deb 包（\`easygateway\` 与 \`easygateway-server\`），可同时安装：桌面端管理网关，服务端提供 systemd 托管的网关进程。Linux 桌面端运行需要 libgtk-3 与 libwebkit2gtk-4.1（包依赖已声明）；用户级安装运行 \`easygateway-desktop-install-linux-*.sh\`，装到 \`~/.easygateway\` 并支持应用内更新。
 
           ### 快速使用
           \`\`\`bash
@@ -270,6 +323,8 @@ jobs:
             release/gateway-darwin-arm64
             release/gateway-windows-amd64.exe
             release/*.deb
+            release/*.tar.gz
+            release/easygateway-desktop-install-linux-*.sh
             release/providers.yaml
             release/default.env.example
             release/install.sh

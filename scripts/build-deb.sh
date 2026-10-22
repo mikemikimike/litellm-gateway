@@ -20,6 +20,8 @@
 #   /var/lib/easygateway                          运行数据（SQLite、技能同步等）
 #   /lib/systemd/system/easygateway.service       systemd 服务
 #
+# 包名为 easygateway-server，与桌面客户端 deb（mygo 打包，包名 easygateway）区分。
+#
 set -euo pipefail
 
 usage() { sed -n '2,20p' "$0" >&2; exit 1; }
@@ -39,7 +41,7 @@ STAGING="$(mktemp -d /tmp/easygateway-deb.XXXXXX)"
 trap 'rm -rf "$STAGING"' EXIT
 
 DEB_VERSION="${VERSION}-1"
-PKG="easygateway_${DEB_VERSION}_${ARCH}"
+PKG="easygateway-server_${DEB_VERSION}_${ARCH}"
 
 # ── 1. 编译二进制 ──
 mkdir -p "${STAGING}/usr/bin"
@@ -69,16 +71,21 @@ chmod 0755 "${STAGING}/var/lib/easygateway"
 
 # ── 5. 控制信息与维护脚本 ──
 mkdir -p "${STAGING}/DEBIAN"
+# 旧服务端包（v0.3.6-1 及更早叫 easygateway）迁移：Conflicts+Replaces 让
+# dpkg -i 直接可用；版本上界取第一个桌面包版本 0.3.7，桌面包自身不受影响。
 cat > "${STAGING}/DEBIAN/control" <<EOF
-Package: easygateway
+Package: easygateway-server
 Version: ${DEB_VERSION}
 Section: net
 Priority: optional
 Architecture: ${ARCH}
 Depends: adduser
+Conflicts: easygateway (<< 0.3.7)
+Replaces: easygateway
+Provides: easygateway
 Maintainer: weijian <weijian@example.com>
 Homepage: https://github.com/hwj123hwj/litellm-gateway
-Description: EasyGateway - personal AI infrastructure gateway
+Description: EasyGateway - personal AI infrastructure gateway (server)
  Unified AI gateway written in Go: one endpoint for Claude Code,
  Codex CLI and other AI apps, with OpenAI Chat Completions,
  Anthropic Messages and OpenAI Responses protocol support,
@@ -190,7 +197,7 @@ cp "${REPO_ROOT}/README.md" "${DOC_DIR}/README.md"
 gzip -9n -c "${REPO_ROOT}/go-gateway/README.md" > "${DOC_DIR}/gateway-README.md.gz"
 cat > "${DOC_DIR}/copyright" <<EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: easygateway
+Upstream-Name: easygateway-server
 Source: https://github.com/hwj123hwj/litellm-gateway
 
 Files: *
@@ -198,7 +205,7 @@ Copyright: 2026 weijian <weijian@example.com>
 License: MIT
 EOF
 gzip -9n > "${DOC_DIR}/changelog.Debian.gz" <<EOF
-easygateway (${DEB_VERSION}) unstable; urgency=medium
+easygateway-server (${DEB_VERSION}) unstable; urgency=medium
 
   * Release ${VERSION}.
 
